@@ -1,0 +1,1363 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08090c">
+  <title>Lucy — Chat</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f6eff4;
+      --muted: #a89aa5;
+      --paper: #08090c;
+      --surface: #15141a;
+      --rose: #f0449b;
+      --rose-dark: #ff79bc;
+      --line: rgba(255,255,255,.12);
+      --user-bubble: #2a1727;
+      --shadow: 0 14px 40px rgba(0,0,0,.38);
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100%; margin: 0; }
+    body { min-height: 100vh; background: var(--paper); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, input { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    .hidden { display: none !important; }
+    .app-page { min-height: 100vh; }
+    .chat-page { min-height: 100vh; display: flex; flex-direction: column; background: radial-gradient(circle at 100% 0, rgba(132,42,90,.18) 0, transparent 31rem), var(--paper); }
+    .topbar { z-index: 5; height: 78px; flex: 0 0 78px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 clamp(16px, 5vw, 64px); border-bottom: 1px solid rgba(255,255,255,.09); background: rgba(10,10,13,.90); backdrop-filter: blur(18px); }
+    .profile { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .profile-pic { width: 48px; height: 48px; flex: 0 0 48px; object-fit: cover; object-position: center; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 10px rgba(57, 38, 35, .16); }
+    .profile-meta { min-width: 0; }
+    .profile-name { margin: 0; font-size: 16px; line-height: 1.2; font-weight: 700; }
+    .profile-presence { display: flex; align-items: center; gap: 6px; margin-top: 5px; color: var(--muted); font-size: 11px; }
+    .online-dot { width: 7px; height: 7px; border-radius: 50%; background: #62a375; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .icon-button { width: 42px; height: 42px; display: inline-grid; place-items: center; border: 1px solid rgba(240,68,155,.30); border-radius: 50%; background: rgba(240,68,155,.07); color: var(--rose-dark); cursor: pointer; transition: transform .16s, background .16s, color .16s; }
+    .icon-button:hover { transform: translateY(-1px); background: rgba(240,68,155,.16); color: #ff9acb; }
+    .icon-button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .call-top-button { height: 42px; display: inline-flex; align-items: center; gap: 9px; padding: 0 17px; border: 1px solid rgba(240,68,155,.38); border-radius: 999px; background: rgba(240,68,155,.10); color: #ff79bc; cursor: pointer; font-size: 13px; font-weight: 680; box-shadow: 0 6px 22px rgba(240,68,155,.10); transition: transform .16s, background .16s; }
+    .call-top-button:hover { transform: translateY(-1px); background: rgba(240,68,155,.19); }
+    .call-top-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .chat-main { width: min(100%, 960px); flex: 1; min-height: 0; display: flex; flex-direction: column; align-self: center; padding: 0 22px; }
+    .chat-intro { padding: 25px 4px 10px; color: var(--muted); font-size: 12px; }
+    .chat-intro strong { color: #ff8bc3; font-weight: 600; }
+    .chat-messages { flex: 1; min-height: 180px; display: flex; flex-direction: column; gap: 13px; overflow-y: auto; padding: 14px 0 24px; scroll-behavior: smooth; }
+    .bubble-row { width: 100%; display: flex; align-items: flex-end; gap: 8px; }
+    .bubble-row.user-row { justify-content: flex-end; }
+    .bubble-avatar { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 50%; object-fit: cover; }
+    .bubble { max-width: min(78%, 590px); padding: 12px 15px; border: 1px solid rgba(255,255,255,.08); border-radius: 18px 18px 18px 5px; background: #17161c; box-shadow: 0 6px 20px rgba(0,0,0,.20); font-size: 14px; line-height: 1.52; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .user-row .bubble { border-color: transparent; border-radius: 18px 18px 5px 18px; background: var(--user-bubble); box-shadow: none; }
+    .bubble-time { display: block; margin-top: 5px; color: #988d97; font-size: 9px; text-align: right; }
+    .composer-area { position: sticky; bottom: 0; padding: 13px 0 max(18px, env(safe-area-inset-bottom)); background: linear-gradient(180deg, rgba(8,9,12,0), rgba(8,9,12,.97) 19%); }
+    .composer { display: flex; align-items: center; gap: 9px; padding: 8px; border: 1px solid rgba(255,255,255,.12); border-radius: 22px; background: #15141a; box-shadow: var(--shadow); }
+    .composer-input { flex: 1; min-width: 0; height: 43px; padding: 0 8px; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 14px; }
+    .composer-input::placeholder { color: #948894; }
+    .composer-action { width: 42px; height: 42px; display: inline-grid; flex: 0 0 42px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: #ff79bc; cursor: pointer; transition: background .15s, color .15s, transform .15s; }
+    .composer-action:hover { background: rgba(240,68,155,.12); color: #ffa0cf; }
+    .composer-action svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .composer-action.listening { background: rgba(240,68,155,.20); color: #ffaad4; animation: micPulse 1.2s ease-in-out infinite; }
+    .send-button { width: 43px; height: 43px; display: inline-grid; flex: 0 0 43px; place-items: center; border: 1px solid rgba(240,68,155,.38); border-radius: 50%; background: rgba(240,68,155,.12); color: #ff79bc; cursor: pointer; transition: background .15s, transform .15s; }
+    .send-button:hover { transform: scale(1.04); background: rgba(240,68,155,.24); }
+    .send-button:disabled { opacity: .55; cursor: wait; }
+    .send-button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .composer-help { min-height: 18px; padding: 6px 12px 0; color: var(--muted); font-size: 10px; }
+    .composer-tools { position: relative; display: contents; }
+    .tools-popover { position: absolute; z-index: 12; left: 0; bottom: 88px; width: min(330px, calc(100vw - 34px)); display: grid; gap: 4px; padding: 8px; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; background: rgba(21,20,26,.98); box-shadow: 0 18px 48px rgba(0,0,0,.55); backdrop-filter: blur(15px); }
+    .tool-option { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 8px 11px; border: 0; border-radius: 12px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+    .tool-option:hover, .tool-option.selected { background: rgba(240,68,155,.12); }
+    .tool-option svg { width: 20px; height: 20px; flex: 0 0 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; color: var(--rose-dark); }
+    .tool-copy { flex: 1; display: grid; gap: 3px; }
+    .tool-copy strong { font-size: 12px; font-weight: 650; }
+    .tool-copy small { color: var(--muted); font-size: 10px; }
+    .tool-state { min-width: 38px; padding: 5px 7px; border-radius: 99px; background: rgba(255,255,255,.08); color: #b6aab5; font-size: 9px; text-align: center; }
+    .tool-option.selected .tool-state { background: rgba(240,68,155,.22); color: #ff9acb; }
+    .mature-option { border-top: 1px solid rgba(255,255,255,.10); border-radius: 0 0 12px 12px; cursor: pointer; }
+    .source-list { display: grid; gap: 5px; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.12); }
+    .source-link { display: block; max-width: 100%; overflow: hidden; color: #ff8bc3; font-size: 10px; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+    .source-link:hover { text-decoration: underline; }
+    .typing-bubble { min-width: 55px; display: flex; justify-content: center; gap: 4px; }
+    .typing-bubble i { width: 5px; height: 5px; border-radius: 50%; background: #ff79bc; animation: dotBounce .9s infinite ease-in-out; }
+    .typing-bubble i:nth-child(2) { animation-delay: .12s; }
+    .typing-bubble i:nth-child(3) { animation-delay: .24s; }
+    .toast { position: fixed; z-index: 20; left: 50%; bottom: 96px; transform: translateX(-50%); max-width: min(90vw, 440px); padding: 11px 16px; border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: #17161c; box-shadow: var(--shadow); color: #f6eff4; font-size: 12px; text-align: center; }
+    .call-page { min-height: 100vh; position: relative; display: flex; flex-direction: column; overflow: hidden; background: radial-gradient(ellipse at 50% 43%, #402333 0, #19151c 41%, #08090c 82%); color: #fffaf6; }
+    .call-topbar { position: relative; z-index: 2; min-height: 76px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(16px, 5vw, 64px); border-bottom: 1px solid rgba(255,255,255,.10); background: rgba(27,24,25,.30); backdrop-filter: blur(14px); }
+    .back-button { display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent; color: rgba(255,250,246,.84); cursor: pointer; font-size: 13px; }
+    .back-button svg { width: 20px; height: 20px; fill: none; stroke: #ff79bc; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .call-profile { display: flex; align-items: center; gap: 10px; }
+    .call-profile img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(255,255,255,.65); }
+    .call-profile strong { font-size: 14px; }
+    .call-top-status { color: rgba(255,255,255,.64); font-size: 12px; }
+    .call-content { width: min(100%, 1120px); flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(250px, .85fr) minmax(320px, 1.15fr); align-items: center; gap: clamp(20px, 5vw, 70px); margin: 0 auto; padding: 28px clamp(18px, 5vw, 60px); }
+    .call-portrait { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .portrait-stage { width: clamp(210px, 27vw, 300px); aspect-ratio: 1; position: relative; display: grid; place-items: center; perspective: 900px; transform-style: preserve-3d; }
+    .portrait-halo { position: absolute; inset: 5%; border: 1px solid rgba(255,224,214,.30); border-radius: 50%; box-shadow: 0 0 70px rgba(235,147,146,.11), inset 0 0 55px rgba(235,147,146,.08); animation: haloSpin 15s linear infinite; transform: rotateX(68deg) rotateZ(-15deg); }
+    .portrait-halo::before, .portrait-halo::after { content: ""; position: absolute; border: 1px solid rgba(255,224,214,.22); border-radius: 50%; }
+    .portrait-halo::before { inset: 12%; transform: rotateY(58deg); }
+    .portrait-halo::after { inset: -8%; transform: rotateX(53deg) rotateY(20deg); }
+    .portrait-photo-wrap { z-index: 1; width: 67%; aspect-ratio: 1; padding: 5px; border: 1px solid rgba(255,255,255,.58); border-radius: 50%; background: linear-gradient(135deg, rgba(255,255,255,.3), rgba(233,150,149,.23)); box-shadow: 0 24px 85px rgba(0,0,0,.34), 0 0 48px rgba(223,137,140,.26); transform-style: preserve-3d; animation: avatarFloat 5s ease-in-out infinite; }
+    .portrait-photo { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; transform: translateZ(14px); }
+    .call-active .portrait-photo-wrap { animation-duration: 2.2s; }
+    .portrait-stage.speaking .portrait-photo-wrap { animation-duration: 1.25s; filter: saturate(1.12) brightness(1.08); }
+    .portrait-stage.speaking .portrait-halo { animation-duration: 4s; border-color: rgba(255,229,218,.72); box-shadow: 0 0 95px rgba(235,147,146,.28), inset 0 0 60px rgba(235,147,146,.16); }
+    .call-portrait h1 { margin: 8px 0 5px; font-family: Georgia, "Times New Roman", serif; font-size: 35px; font-weight: 500; letter-spacing: -.03em; }
+    .call-timer { color: rgba(255,250,246,.68); font-size: 13px; font-variant-numeric: tabular-nums; }
+    .call-chat-panel { display: flex; flex-direction: column; min-height: 350px; max-height: 56vh; overflow: hidden; border: 1px solid rgba(255,255,255,.14); border-radius: 24px; background: rgba(255,255,255,.075); box-shadow: 0 22px 65px rgba(0,0,0,.18); backdrop-filter: blur(18px); }
+    .call-chat-heading { display: flex; align-items: center; justify-content: space-between; padding: 16px 19px; border-bottom: 1px solid rgba(255,255,255,.11); color: rgba(255,250,246,.88); font-size: 12px; }
+    .call-chat-heading span:last-child { color: rgba(255,250,246,.56); font-size: 10px; }
+    .call-messages { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 11px; overflow-y: auto; padding: 18px; scroll-behavior: smooth; }
+    .call-messages .bubble-row { gap: 7px; }
+    .call-messages .bubble { max-width: 88%; padding: 10px 13px; border: 1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.13); color: #fffaf6; box-shadow: none; font-size: 12px; }
+    .call-messages .user-row .bubble { border-color: rgba(234,164,168,.28); background: rgba(197,106,119,.23); }
+    .call-messages .bubble-avatar { width: 22px; height: 22px; flex-basis: 22px; }
+    .call-messages .bubble-time { color: rgba(255,255,255,.45); }
+    .call-caption { min-height: 37px; display: flex; align-items: center; justify-content: center; padding: 0 14px 12px; color: rgba(255,250,246,.65); font-size: 11px; text-align: center; }
+    .call-controls { z-index: 2; min-height: 108px; display: flex; align-items: center; justify-content: center; gap: 17px; padding: 16px 20px max(24px, env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,.10); background: rgba(25,22,23,.28); }
+    .call-control { width: 52px; height: 52px; display: inline-grid; place-items: center; border: 1px solid rgba(240,68,155,.30); border-radius: 50%; background: rgba(240,68,155,.09); color: #ff79bc; cursor: pointer; transition: transform .15s, background .15s; }
+    .call-control:hover { transform: translateY(-2px); background: rgba(240,68,155,.19); }
+    .call-control svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .call-control.active { background: rgba(240,68,155,.26); }
+    .call-control.end-call { width: 62px; height: 62px; border: 0; background: #d94f59; box-shadow: 0 8px 30px rgba(217,79,89,.35); }
+    .call-control.end-call:hover { background: #c43e49; }
+    .control-label { position: absolute; margin-top: 76px; color: rgba(255,255,255,.66); font-size: 9px; white-space: nowrap; }
+    .control-wrap { position: relative; display: grid; justify-items: center; }
+    @keyframes micPulse { 50% { box-shadow: 0 0 0 5px rgba(240,68,155,.22); } }
+    @keyframes dotBounce { 0%, 60%, 100% { transform: translateY(0); opacity: .55; } 30% { transform: translateY(-4px); opacity: 1; } }
+    @keyframes haloSpin { to { transform: rotateX(68deg) rotateZ(345deg); } }
+    @keyframes avatarFloat { 0%, 100% { transform: translateY(0) rotateY(-5deg) rotateX(2deg); } 50% { transform: translateY(-8px) rotateY(5deg) rotateX(-2deg); } }
+    @media (max-width: 720px) {
+      .topbar { height: 68px; flex-basis: 68px; padding: 0 14px; }
+      .profile-pic { width: 43px; height: 43px; flex-basis: 43px; }
+      .profile-name { font-size: 15px; }
+      .top-actions { gap: 7px; }
+      .icon-button { width: 39px; height: 39px; }
+      .call-top-button { width: 42px; height: 42px; justify-content: center; padding: 0; }
+      .call-top-button .call-label { display: none; }
+      .chat-main { padding: 0 13px; }
+      .chat-intro { padding-top: 17px; }
+      .chat-messages { gap: 11px; }
+      .bubble { max-width: 85%; font-size: 13px; }
+      .composer { gap: 4px; padding: 6px; border-radius: 19px; }
+      .composer-input { font-size: 13px; }
+      .composer-action, .send-button { width: 39px; height: 39px; flex-basis: 39px; }
+      .call-topbar { min-height: 66px; padding: 0 15px; }
+      .call-content { grid-template-columns: 1fr; gap: 10px; align-content: center; padding: 12px 16px; }
+      .portrait-stage { width: clamp(150px, 42vw, 220px); }
+      .call-portrait h1 { font-size: 28px; margin-top: 1px; }
+      .call-chat-panel { min-height: 180px; max-height: 30vh; }
+      .call-messages { padding: 12px; }
+      .call-controls { min-height: 96px; gap: 22px; }
+      .call-control { width: 48px; height: 48px; }
+      .call-control.end-call { width: 58px; height: 58px; }
+    }
+    @media (max-width: 390px) {
+      .topbar { padding: 0 10px; }
+      .top-actions { gap: 5px; }
+      .call-content { padding: 8px 12px; }
+      .call-chat-panel { min-height: 155px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; } }
+  
+    /* Call screen: no chat transcript while calling — only Lucy, status text and controls */
+    .call-chat-heading, .call-messages { display: none !important; }
+    .call-content { grid-template-columns: 1fr !important; justify-items: center; align-content: center; gap: 18px; }
+    .call-chat-panel { min-height: 0 !important; max-height: none !important; width: min(100%, 520px); border: 0 !important; background: transparent !important; box-shadow: none !important; backdrop-filter: none !important; }
+    .call-caption { min-height: 56px; padding: 0 12px; font-size: 15px; line-height: 1.5; color: rgba(255,250,246,.82); }
+  </style>
+</head>
+<body>
+  <main class="app-page chat-page" id="chatPage">
+    <header class="topbar">
+      <div class="profile">
+        <img class="profile-pic" src="/lucy-avatar.png" alt="Lucy profile picture" width="48" height="48">
+        <div class="profile-meta">
+          <h1 class="profile-name">Lucy</h1>
+          <div class="profile-presence"><span class="online-dot"></span><span>AI companion</span></div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="icon-button" id="soundToggle" type="button" aria-label="Turn sound off" title="Sound on">
+          <svg id="soundIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path></svg>
+        </button>
+        <button class="call-top-button" id="openCallButton" type="button" aria-label="Start voice call" title="Start voice call">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H5a2 2 0 0 0-2 2c0 8.8 7.2 16 16 16a2 2 0 0 0 2-2v-2l-5-2-2 3a14 14 0 0 1-6-6l3-2z"></path></svg>
+          <span class="call-label">Call</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="chat-main" aria-label="Lucy chat">
+      <div class="chat-intro"><strong>Today</strong> <span>· Your conversation with Lucy</span></div>
+      <div class="chat-messages" id="chatMessages" aria-live="polite">
+        <div class="bubble-row">
+          <img class="bubble-avatar" src="/lucy-avatar.png" alt="" aria-hidden="true">
+          <div class="bubble">Hi, I'm Lucy — created by Abhimanyu Rana, a thoughtful developer with a creative vision. I'm glad you're here. What would you like to talk about?<span class="bubble-time">Just now</span></div>
+        </div>
+      </div>
+      <div class="composer-area">
+        <div class="tools-popover hidden" id="toolsMenu" role="menu" aria-label="Chat tools">
+          <button class="tool-option" id="webSearchToggle" type="button" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 4.5 4.5"></path></svg>
+            <span class="tool-copy"><strong>Search web</strong><small>Use live web results in Lucy's answer</small></span>
+            <span class="tool-state" id="webSearchState">OFF</span>
+          </button>
+          <button class="tool-option mature-option" id="matureModeToggle" type="button" aria-pressed="false" title="Adults 18+ only; confirmation required">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 14 9l6 3-6 3-2 6-2-6-6-3 6-3z"></path></svg>
+            <span class="tool-copy"><strong>Mature chat · Adults 18+</strong><small>Off by default; safety rules still apply</small></span>
+            <span class="tool-state" id="matureModeState">OFF</span>
+          </button>
+          <button class="tool-option clear-chat-option" id="clearChatButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"></path></svg>
+            <span class="tool-copy"><strong>Delete chat</strong><small>Clear this conversation on this device</small></span>
+          </button>
+        </div>
+        <form class="composer" id="chatComposer">
+          <button class="composer-action" id="toolsButton" type="button" aria-label="Open chat tools" title="More options" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          </button>
+          <button class="composer-action" id="dictationButton" type="button" aria-label="Speak to type" title="Speak to type">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3m-4 0h8"></path></svg>
+          </button>
+          <input class="composer-input" id="messageInput" type="text" maxlength="4000" placeholder="Message Lucy…" autocomplete="off" aria-label="Message Lucy">
+          <button class="send-button" id="sendButton" type="submit" aria-label="Send message" title="Send">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z"></path><path d="M22 2 11 13"></path></svg>
+          </button>
+        </form>
+        <div class="composer-help" id="composerHelp" aria-live="polite">Tap the microphone to dictate. Press Enter to send.</div>
+      </div>
+    </section>
+    <div class="toast hidden" id="toast" role="status"></div>
+  </main>
+
+  <main class="app-page call-page hidden" id="callPage">
+    <header class="call-topbar">
+      <button class="back-button" id="backToChatButton" type="button" aria-label="Back to chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path><path d="M9 12h12"></path></svg><span>Chat</span>
+      </button>
+      <div class="call-profile"><img src="/lucy-avatar.png" alt=""><strong>Lucy</strong></div>
+      <div class="call-top-status" id="callTopStatus">Ready to call</div>
+    </header>
+    <section class="call-content">
+      <div class="call-portrait">
+        <div class="portrait-stage" id="portraitStage">
+          <div class="portrait-halo" aria-hidden="true"></div>
+          <div class="portrait-photo-wrap"><img class="portrait-photo" src="/lucy-avatar.png" alt="Lucy"></div>
+        </div>
+        <h1>Lucy</h1>
+        <div class="call-timer" id="callTimer">Tap the call button below</div>
+      </div>
+      <section class="call-chat-panel" aria-label="Live call conversation">
+        <div class="call-chat-heading"><span>Conversation</span><span id="callTranscriptHint">Your live transcript appears here</span></div>
+        <div class="call-messages" id="callMessages" aria-live="polite"></div>
+        <div class="call-caption" id="callCaption">Start the call and speak naturally.</div>
+      </section>
+    </section>
+    <footer class="call-controls">
+      <div class="control-wrap">
+        <button class="call-control" id="callMicButton" type="button" aria-label="Mute microphone" title="Mute microphone">
+          <svg id="micIcon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3m-4 0h8"></path></svg>
+        </button><span class="control-label" id="micLabel">Mic on</span>
+      </div>
+      <div class="control-wrap">
+        <button class="call-control" id="callSoundButton" type="button" aria-label="Mute Lucy's voice" title="Mute Lucy's voice">
+          <svg id="callSoundIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path></svg>
+        </button><span class="control-label" id="callSoundLabel">Sound on</span>
+      </div>
+      <div class="control-wrap">
+        <button class="call-control end-call" id="endCallButton" type="button" aria-label="End call" title="End call">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14.5a13 13 0 0 1 16 0l-2.5 4-4-2v-2a8 8 0 0 0-3 0v2l-4 2z"></path></svg>
+        </button><span class="control-label">End call</span>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const chatPage = document.getElementById('chatPage');
+    const callPage = document.getElementById('callPage');
+    const chatMessages = document.getElementById('chatMessages');
+    const initialChatMessage = chatMessages.firstElementChild.cloneNode(true);
+    const callMessages = document.getElementById('callMessages');
+    const messageInput = document.getElementById('messageInput');
+    const chatComposer = document.getElementById('chatComposer');
+    const sendButton = document.getElementById('sendButton');
+    const dictationButton = document.getElementById('dictationButton');
+    const toolsButton = document.getElementById('toolsButton');
+    const toolsMenu = document.getElementById('toolsMenu');
+    const webSearchToggle = document.getElementById('webSearchToggle');
+    const webSearchState = document.getElementById('webSearchState');
+    const matureModeToggle = document.getElementById('matureModeToggle');
+    const matureModeState = document.getElementById('matureModeState');
+    const clearChatButton = document.getElementById('clearChatButton');
+    const composerHelp = document.getElementById('composerHelp');
+    const toast = document.getElementById('toast');
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    const callTopStatus = document.getElementById('callTopStatus');
+    const callTimer = document.getElementById('callTimer');
+    const callCaption = document.getElementById('callCaption');
+    const portraitStage = document.getElementById('portraitStage');
+    const callMicButton = document.getElementById('callMicButton');
+    const micLabel = document.getElementById('micLabel');
+    const micIcon = document.getElementById('micIcon');
+    const callSoundButton = document.getElementById('callSoundButton');
+    const callSoundIcon = document.getElementById('callSoundIcon');
+    const callSoundLabel = document.getElementById('callSoundLabel');
+
+    let conversationHistory = [];
+    let soundOn = true;
+    let webSearchEnabled = false;
+    let matureModeEnabled = false;
+    let providersLoaded = false;
+    let searchAvailable = false;
+    let ttsAvailable = false;
+    let sttAvailable = false;
+    let activeAudio = null;
+    let activeAudioUrl = null;
+    let ttsAbortController = null;
+    let speechGeneration = 0;
+    let callMuted = false;
+    let micMuted = false;
+    let callActive = false;
+    let recognition = null;
+    let dictationRecognition = null;
+    let dictationActive = false;
+    let awaitingReply = false;
+    let speaking = false;
+    let requestBusy = false;
+    let toastTimer = null;
+    let callStartedAt = 0;
+    let timerInterval = null;
+    let callInputMode = 'browser';
+    let recognitionRunning = false;
+    let micBlocked = false;
+    let callTranscribing = false;
+    let callWatchdog = null;
+    let speakingSince = 0;
+    let callMediaStream = null;
+    let recorderStarting = false;
+    let interimTimer = 0;
+    let lastInterim = '';
+    const END_OF_SPEECH_MS = 650;
+    let callAudioContext = null;
+    let callAudioSource = null;
+    let callAnalyser = null;
+    let callRecorder = null;
+    let callChunks = [];
+    let callVadFrame = 0;
+    let callSpeechDetected = false;
+    let callRecordingStartedAt = 0;
+    let callLastVoiceAt = 0;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.add('hidden'), 3800);
+    }
+
+    function showPage(which) {
+      const onCall = which === 'call';
+      chatPage.classList.toggle('hidden', onCall);
+      callPage.classList.toggle('hidden', !onCall);
+      document.title = onCall ? 'Lucy — Voice Call' : 'Lucy — Chat';
+      if (onCall) syncCallTranscript();
+    }
+
+    function openCallPage() {
+      if (location.pathname !== '/call') window.history.pushState({ page: 'call' }, '', '/call');
+      showPage('call');
+      startCall();
+    }
+
+    function navigateToChat() {
+      if (location.pathname === '/call') window.history.pushState({ page: 'chat' }, '', '/');
+      endCall(false);
+      showPage('chat');
+    }
+
+    window.addEventListener('popstate', () => {
+      if (location.pathname === '/call') {
+        showPage('call');
+      } else {
+        endCall(false);
+        showPage('chat');
+      }
+    });
+
+    function formatTime() {
+      return new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' }).format(new Date());
+    }
+
+    function makeBubble(role, text, sources = []) {
+      const row = document.createElement('div');
+      row.className = `bubble-row ${role === 'user' ? 'user-row' : ''}`;
+      if (role !== 'user') {
+        const avatar = document.createElement('img');
+        avatar.className = 'bubble-avatar';
+        avatar.src = '/lucy-avatar.png';
+        avatar.alt = '';
+        avatar.setAttribute('aria-hidden', 'true');
+        row.appendChild(avatar);
+      }
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.appendChild(document.createTextNode(text));
+      if (role !== 'user' && Array.isArray(sources) && sources.length) {
+        const sourceList = document.createElement('div');
+        sourceList.className = 'source-list';
+        sources.slice(0, 5).forEach((source, index) => {
+          try {
+            const url = new URL(source.link);
+            if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
+            const link = document.createElement('a');
+            link.className = 'source-link';
+            link.href = url.href;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = `[${index + 1}] ${source.title || url.hostname}`;
+            link.title = source.snippet || source.title || url.href;
+            sourceList.appendChild(link);
+          } catch (_) { /* Ignore malformed search result links. */ }
+        });
+        if (sourceList.childElementCount) bubble.appendChild(sourceList);
+      }
+      const time = document.createElement('span');
+      time.className = 'bubble-time';
+      time.textContent = formatTime();
+      bubble.appendChild(time);
+      row.appendChild(bubble);
+      return row;
+    }
+
+    function appendMessage(role, text, sources = []) {
+      chatMessages.appendChild(makeBubble(role, text, sources));
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      if (!callPage.classList.contains('hidden')) {
+        callMessages.appendChild(makeBubble(role, text, sources));
+        callMessages.scrollTop = callMessages.scrollHeight;
+      }
+    }
+
+    function showTypingIndicator() {
+      removeTypingIndicator();
+      const row = makeBubble('assistant', '');
+      row.classList.add('typing-indicator');
+      const bubble = row.querySelector('.bubble');
+      bubble.replaceChildren();
+      bubble.classList.add('typing-bubble');
+      for (let i = 0; i < 3; i++) bubble.appendChild(document.createElement('i'));
+      chatMessages.appendChild(row);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      if (!callPage.classList.contains('hidden')) {
+        const callRow = row.cloneNode(true);
+        callRow.removeAttribute('id');
+        callMessages.appendChild(callRow);
+        callMessages.scrollTop = callMessages.scrollHeight;
+      }
+    }
+
+    function removeTypingIndicator() {
+      document.querySelectorAll('.typing-indicator').forEach(node => node.remove());
+    }
+
+    function syncCallTranscript() {
+      callMessages.replaceChildren(...Array.from(chatMessages.children, node => node.cloneNode(true)));
+      callMessages.scrollTop = callMessages.scrollHeight;
+    }
+
+    function setSoundState(enabled) {
+      soundOn = enabled;
+      soundToggle.setAttribute('aria-label', enabled ? 'Turn sound off' : 'Turn sound on');
+      soundToggle.title = enabled ? 'Sound on' : 'Sound off';
+      soundIcon.innerHTML = enabled
+        ? '<path d="M11 5 6 9H3v6h3l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path>'
+        : '<path d="M11 5 6 9H3v6h3l5 4z"></path><path d="m16 9 5 6m0-6-5 6"></path>';
+      if (!enabled && !callActive) stopCurrentSpeech();
+    }
+
+    function setCallSoundState(enabled) {
+      callMuted = !enabled;
+      callSoundButton.classList.toggle('active', !enabled);
+      callSoundButton.setAttribute('aria-label', enabled ? "Mute Lucy's voice" : "Unmute Lucy's voice");
+      callSoundButton.title = enabled ? "Mute Lucy's voice" : "Unmute Lucy's voice";
+      callSoundLabel.textContent = enabled ? 'Sound on' : 'Sound off';
+      callSoundIcon.innerHTML = enabled
+        ? '<path d="M11 5 6 9H3v6h3l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path>'
+        : '<path d="M11 5 6 9H3v6h3l5 4z"></path><path d="m16 9 5 6m0-6-5 6"></path>';
+      if (!enabled) stopCurrentSpeech();
+      if (callActive && awaitingReply === false && !micMuted) startCallListening();
+    }
+
+    function chooseVoiceLanguage(text) {
+      return /[\u0900-\u097F]/.test(text) ? 'hi-IN' : 'en-IN';
+    }
+
+    function cleanSpeechText(text) {
+      return String(text || '')
+        .replace(/https?:\/\/\S+/gi, ' ')
+        .replace(/\*[^*]{1,60}\*/g, ' ')
+        .replace(/\((?:laugh|giggl|sigh|cry|sob|sing|hum)[^)]*\)/gi, ' ')
+        .replace(/\b(?:ha(?:ha)+h?|he(?:he)+h?|hi(?:hi)+|hehe+|haha+|lol|lmao|rofl|muah+|mwah+|hmm+|umm+|uhh+|ahh+|ohh+|aww+|uff+|sigh|sob+|boo\s?hoo)\b/gi, ' ')
+        .replace(/([\p{L}])\1{2,}/gu, '$1$1')
+        .replace(/\.{2,}|\u2026/g, ', ')
+        .replace(/\[[^\]]*\]/g, ' ')
+        .replace(/[#$@%^&*_+=~<>|{}\[\]\\`]+/g, ' ')
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function stopCurrentSpeech() {
+      speechGeneration++;
+      if (ttsAbortController) {
+        ttsAbortController.abort();
+        ttsAbortController = null;
+      }
+      if (activeAudio) {
+        activeAudio.pause();
+        activeAudio.src = '';
+        activeAudio = null;
+      }
+      if (activeAudioUrl) {
+        URL.revokeObjectURL(activeAudioUrl);
+        activeAudioUrl = null;
+      }
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      speaking = false;
+      portraitStage.classList.remove('speaking');
+    }
+
+    function finishSpeech(duringCall, token) {
+      if (token !== speechGeneration) return;
+      speaking = false;
+      portraitStage.classList.remove('speaking');
+      if (duringCall && callActive) startCallListening();
+    }
+
+    function speakWithBrowser(text, duringCall, token) {
+      if (token !== speechGeneration) return;
+      if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) {
+        finishSpeech(duringCall, token);
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = chooseVoiceLanguage(text);
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      const voices = window.speechSynthesis.getVoices();
+      const voice = voices.find(item => item.lang.toLowerCase() === utterance.lang.toLowerCase())
+        || voices.find(item => item.lang.toLowerCase().startsWith(utterance.lang.slice(0, 2)));
+      if (voice) utterance.voice = voice;
+      utterance.onstart = () => {
+        if (token !== speechGeneration) return;
+        speaking = true;
+        if (duringCall) {
+          callTopStatus.textContent = 'Lucy is speaking';
+          callCaption.textContent = text;
+          portraitStage.classList.add('speaking');
+        }
+      };
+      utterance.onend = () => finishSpeech(duringCall, token);
+      utterance.onerror = () => finishSpeech(duringCall, token);
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function splitForSpeech(text) {
+      // Short first chunk => voice answers fast and Lucy starts talking sooner.
+      const parts = (text.match(/[^.!?\u0964]+[.!?\u0964]*/g) || [text]).map(p => p.trim()).filter(Boolean);
+      const chunks = [];
+      let buf = '';
+      for (const part of parts) {
+        buf = buf ? buf + ' ' + part : part;
+        if (buf.length >= 25) { chunks.push(buf); buf = ''; }
+      }
+      if (buf) {
+        if (chunks.length) chunks[chunks.length - 1] += ' ' + buf;
+        else chunks.push(buf);
+      }
+      while (chunks.length > 5) { const last = chunks.pop(); chunks[chunks.length - 1] += ' ' + last; }
+      return chunks;
+    }
+
+    function playBlob(blob, caption, duringCall, token) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        activeAudio = audio;
+        activeAudioUrl = url;
+        const cleanup = () => {
+          if (activeAudio === audio) activeAudio = null;
+          if (activeAudioUrl === url) { URL.revokeObjectURL(url); activeAudioUrl = null; }
+        };
+        audio.onplay = () => {
+          if (token !== speechGeneration) return;
+          speaking = true;
+          if (duringCall) {
+            callTopStatus.textContent = 'Lucy is speaking';
+            if (caption) callCaption.textContent = caption;
+            portraitStage.classList.add('speaking');
+          }
+        };
+        audio.onended = () => { cleanup(); resolve(); };
+        audio.onerror = () => { cleanup(); reject(new Error('audio error')); };
+        audio.play().catch(err => { cleanup(); reject(err); });
+      });
+    }
+
+    async function speakReply(text, duringCall) {
+      const enabled = duringCall ? !callMuted : soundOn;
+      const spokenText = cleanSpeechText(text);
+      stopCurrentSpeech();
+      const token = speechGeneration;
+      if (!enabled || !spokenText) {
+        finishSpeech(duringCall, token);
+        return;
+      }
+      if (duringCall) {
+        speaking = true;
+        callTopStatus.textContent = 'Lucy is preparing her reply…';
+        portraitStage.classList.add('speaking');
+      }
+      if (!ttsAvailable) {
+        speakWithBrowser(spokenText, duringCall, token);
+        return;
+      }
+
+      const controller = new AbortController();
+      ttsAbortController = controller;
+      const lang = chooseVoiceLanguage(spokenText);
+      const chunks = splitForSpeech(spokenText);
+      // Start ALL chunks right now in parallel; chunk 2+ is ready by the time chunk 1 finishes playing.
+      const jobs = chunks.map(chunk => fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: chunk, language_code: lang }),
+        signal: controller.signal
+      }).then(response => {
+        if (!response.ok) throw new Error('Voice is unavailable.');
+        return response.blob();
+      }));
+      jobs.forEach(job => job.catch(() => {}));
+
+      let played = 0;
+      try {
+        let timer;
+        const firstBlob = await Promise.race([
+          jobs[0],
+          new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Voice slow')), 5000); })
+        ]);
+        clearTimeout(timer);
+        if (token !== speechGeneration) return;
+        for (let i = 0; i < chunks.length; i++) {
+          const blob = i === 0 ? firstBlob : await jobs[i];
+          if (token !== speechGeneration) return;
+          await playBlob(blob, i === 0 ? spokenText : '', duringCall, token);
+          played = i + 1;
+        }
+        if (ttsAbortController === controller) ttsAbortController = null;
+        finishSpeech(duringCall, token);
+      } catch (_) {
+        if (token !== speechGeneration) return;
+        controller.abort();
+        if (ttsAbortController === controller) ttsAbortController = null;
+        // Browser voice only reads whatever the generated voice did not already speak.
+        const rest = chunks.slice(played).join(' ');
+        if (rest) speakWithBrowser(rest, duringCall, token);
+        else finishSpeech(duringCall, token);
+      }
+    }
+
+    function createStreamSpeaker(duringCall) {
+      const enabled = duringCall ? !callMuted : soundOn;
+      stopCurrentSpeech();
+      const token = speechGeneration;
+      const controller = new AbortController();
+      ttsAbortController = controller;
+      const queue = [];
+      let closed = false;
+      let started = false;
+      let wake = null;
+      let browserOnly = !ttsAvailable;
+      const poke = () => { if (wake) { const w = wake; wake = null; w(); } };
+
+      function speakBrowserOnce(text) {
+        return new Promise(resolve => {
+          if (token !== speechGeneration || !('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) { resolve(); return; }
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = chooseVoiceLanguage(text);
+          utterance.rate = 1.05;
+          const voices = window.speechSynthesis.getVoices();
+          const voice = voices.find(v => v.lang.toLowerCase() === utterance.lang.toLowerCase())
+            || voices.find(v => v.lang.toLowerCase().startsWith(utterance.lang.slice(0, 2)));
+          if (voice) utterance.voice = voice;
+          utterance.onstart = () => {
+            if (token !== speechGeneration) return;
+            speaking = true;
+            if (duringCall) {
+              callTopStatus.textContent = 'Lucy is speaking';
+              callCaption.textContent = text;
+              portraitStage.classList.add('speaking');
+            }
+          };
+          utterance.onend = () => resolve();
+          utterance.onerror = () => resolve();
+          window.speechSynthesis.speak(utterance);
+        });
+      }
+
+      async function run() {
+        while (true) {
+          if (token !== speechGeneration) return;
+          const item = queue.shift();
+          if (!item) {
+            if (closed) break;
+            await new Promise(resolve => { wake = resolve; });
+            continue;
+          }
+          if (item.job && !browserOnly) {
+            try {
+              let timer;
+              const blob = await Promise.race([
+                item.job,
+                new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Voice slow')), 6000); })
+              ]);
+              clearTimeout(timer);
+              if (token !== speechGeneration) return;
+              await playBlob(blob, item.text, duringCall, token);
+              continue;
+            } catch (_) {
+              if (token !== speechGeneration) return;
+              browserOnly = true;
+              controller.abort();
+            }
+          }
+          await speakBrowserOnce(item.text);
+        }
+        if (token !== speechGeneration) return;
+        if (ttsAbortController === controller) ttsAbortController = null;
+        finishSpeech(duringCall, token);
+      }
+
+      return {
+        get hasStarted() { return started; },
+        push(raw) {
+          if (token !== speechGeneration || !enabled) return;
+          const spoken = cleanSpeechText(raw);
+          if (!spoken) return;
+          let job = null;
+          if (!browserOnly) {
+            job = fetch('/api/tts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: spoken, language_code: chooseVoiceLanguage(spoken) }),
+              signal: controller.signal
+            }).then(response => {
+              if (!response.ok) throw new Error('Voice is unavailable.');
+              return response.blob();
+            });
+            job.catch(() => {});
+          }
+          queue.push({ text: spoken, job });
+          if (!started) {
+            started = true;
+            speaking = true;
+            if (duringCall) {
+              callTopStatus.textContent = 'Lucy is replying…';
+              portraitStage.classList.add('speaking');
+            }
+            run();
+          }
+          poke();
+        },
+        end() {
+          closed = true;
+          poke();
+          if (!started) finishSpeech(duringCall, token);
+        }
+      };
+    }
+
+    async function sendToLucy(text, fromCall = false) {
+      const message = text.trim();
+      if (!message || requestBusy) return;
+      requestBusy = true;
+      awaitingReply = fromCall;
+      sendButton.disabled = true;
+      appendMessage('user', message);
+      showTypingIndicator();
+      const recentHistory = conversationHistory.slice(-8);
+      callTopStatus.textContent = fromCall ? 'Lucy is thinking…' : 'Chatting';
+      callCaption.textContent = fromCall ? 'Lucy is listening to your message…' : 'Thinking…';
+      composerHelp.textContent = 'Lucy is replying…';
+
+      const speaker = (fromCall && !callActive) ? null : createStreamSpeaker(fromCall);
+      let bubbleRow = null;
+      let bubbleText = null;
+      let streamed = '';
+      let finalEvent = null;
+      const handleEvent = evt => {
+        if (evt.type === 'sentence') {
+          streamed = streamed ? streamed + ' ' + evt.text : evt.text;
+          if (!bubbleRow) {
+            removeTypingIndicator();
+            bubbleRow = makeBubble('assistant', '');
+            bubbleText = bubbleRow.querySelector('.bubble').firstChild;
+            chatMessages.appendChild(bubbleRow);
+            if (fromCall) callCaption.textContent = evt.text;
+          }
+          bubbleText.nodeValue = streamed;
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          if (speaker) speaker.push(evt.text);
+        } else if (evt.type === 'error') {
+          throw new Error(evt.detail || 'Lucy could not reply. Try again.');
+        } else if (evt.type === 'done') {
+          finalEvent = evt;
+        }
+      };
+
+      try {
+        const response = await fetch('/api/chat/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            history: recentHistory,
+            is_18_plus: matureModeEnabled,
+            mature_mode: matureModeEnabled,
+            web_search: webSearchEnabled,
+            call_mode: fromCall
+          })
+        });
+        if (!response.ok || !response.body) {
+          let detail = '';
+          try { detail = (await response.json()).detail; } catch (_) { /* Not a JSON error body. */ }
+          throw new Error(detail || 'Lucy could not reply. Try again.');
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let pending = '';
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          pending += decoder.decode(value, { stream: true });
+          let newline;
+          while ((newline = pending.indexOf('\n')) >= 0) {
+            const rawLine = pending.slice(0, newline).trim();
+            pending = pending.slice(newline + 1);
+            if (rawLine) handleEvent(JSON.parse(rawLine));
+          }
+        }
+        if (pending.trim()) handleEvent(JSON.parse(pending.trim()));
+
+        const reply = String((finalEvent && finalEvent.reply) || streamed).trim();
+        if (!reply) throw new Error('Lucy returned an empty reply.');
+        const data = finalEvent || {};
+        const sources = data.web_results || [];
+        conversationHistory.push({ role: 'user', content: message }, { role: 'assistant', content: reply });
+        conversationHistory = conversationHistory.slice(-8);
+        removeTypingIndicator();
+        if (bubbleRow) {
+          if (sources.length) bubbleRow.replaceWith(makeBubble('assistant', reply, sources));
+          else bubbleText.nodeValue = reply;
+        } else {
+          appendMessage('assistant', reply, sources);
+        }
+        if (!callPage.classList.contains('hidden')) syncCallTranscript();
+        requestBusy = false;
+        sendButton.disabled = false;
+        awaitingReply = false;
+        composerHelp.textContent = 'Tap the microphone to dictate. Press Enter to send.';
+        callTopStatus.textContent = callActive ? 'Connected' : 'Ready to call';
+        if (!speaker || !speaker.hasStarted) callCaption.textContent = reply;
+        if (data.search_error && webSearchEnabled) showToast('Web search is unavailable right now.');
+        if (data.memories_saved > 0) showToast('Lucy saved a small non-sensitive memory on this device.');
+        if (speaker) speaker.end();
+        else if (fromCall && callActive && !micMuted) startCallListening();
+      } catch (error) {
+        removeTypingIndicator();
+        requestBusy = false;
+        sendButton.disabled = false;
+        awaitingReply = false;
+        composerHelp.textContent = error.message || 'Something went wrong. Please try again.';
+        callCaption.textContent = 'Could not connect. Please try again.';
+        if (speaker) speaker.end();
+        else if (fromCall && callActive && !micMuted) startCallListening();
+      }
+    }
+
+    chatComposer.addEventListener('submit', event => {
+      event.preventDefault();
+      const text = messageInput.value.trim();
+      if (!text || requestBusy) return;
+      messageInput.value = '';
+      sendToLucy(text, false);
+    });
+
+    soundToggle.addEventListener('click', () => setSoundState(!soundOn));
+    toolsButton.addEventListener('click', () => {
+      const open = toolsMenu.classList.contains('hidden');
+      toolsMenu.classList.toggle('hidden', !open);
+      toolsButton.setAttribute('aria-expanded', String(open));
+      toolsButton.title = open ? 'Close chat tools' : 'More options';
+    });
+    webSearchToggle.addEventListener('click', () => {
+      webSearchEnabled = !webSearchEnabled;
+      webSearchToggle.classList.toggle('selected', webSearchEnabled);
+      webSearchToggle.setAttribute('aria-pressed', String(webSearchEnabled));
+      webSearchState.textContent = webSearchEnabled ? 'ON' : 'OFF';
+      if (webSearchEnabled && providersLoaded && !searchAvailable) showToast('Web search is unavailable right now.');
+    });
+    matureModeToggle.addEventListener('click', () => {
+      if (!matureModeEnabled) {
+        const confirmed = window.confirm('Mature chat is for adults 18+ only. Continue only if you are 18 or older. This confirmation does not verify your age; safety rules still apply.');
+        if (!confirmed) return;
+        matureModeEnabled = true;
+      } else {
+        matureModeEnabled = false;
+      }
+      matureModeToggle.classList.toggle('selected', matureModeEnabled);
+      matureModeToggle.setAttribute('aria-pressed', String(matureModeEnabled));
+      matureModeState.textContent = matureModeEnabled ? 'ON' : 'OFF';
+      showToast(matureModeEnabled ? 'Mature chat enabled. Safety rules still apply.' : 'Mature chat turned off.');
+    });
+    clearChatButton.addEventListener('click', () => {
+      const confirmed = window.confirm('Delete this conversation from the screen and clear its recent chat context? Saved memories will remain.');
+      if (!confirmed) return;
+      stopCurrentSpeech();
+      conversationHistory = [];
+      removeTypingIndicator();
+      chatMessages.replaceChildren(initialChatMessage.cloneNode(true));
+      syncCallTranscript();
+      toolsMenu.classList.add('hidden');
+      toolsButton.setAttribute('aria-expanded', 'false');
+      toolsButton.title = 'More options';
+      showToast('Chat cleared. Saved memories remain unchanged.');
+      // stopCurrentSpeech() cancels the speech callbacks that normally re-open the mic,
+      // so during a call we must re-open it ourselves.
+      if (callActive) {
+        awaitingReply = false;
+        if (!requestBusy && !micMuted) setTimeout(startCallListening, 300);
+      }
+    });
+    document.addEventListener('click', event => {
+      if (!toolsMenu.contains(event.target) && !toolsButton.contains(event.target)) {
+        toolsMenu.classList.add('hidden');
+        toolsButton.setAttribute('aria-expanded', 'false');
+        toolsButton.title = 'More options';
+      }
+    });
+    document.getElementById('openCallButton').addEventListener('click', openCallPage);
+    document.getElementById('backToChatButton').addEventListener('click', navigateToChat);
+
+    function beginDictation() {
+      if (!SpeechRecognitionAPI) {
+        showToast('Voice typing is not supported in this browser. Try a recent Chrome or Edge browser.');
+        return;
+      }
+      if (dictationActive && dictationRecognition) {
+        dictationRecognition.stop();
+        return;
+      }
+      dictationRecognition = new SpeechRecognitionAPI();
+      dictationRecognition.lang = 'hi-IN';
+      dictationRecognition.continuous = false;
+      dictationRecognition.interimResults = true;
+      dictationRecognition.onstart = () => {
+        dictationActive = true;
+        dictationButton.classList.add('listening');
+        dictationButton.setAttribute('aria-pressed', 'true');
+        dictationButton.setAttribute('aria-label', 'Stop voice typing');
+        dictationButton.title = 'Microphone on — tap to stop';
+        composerHelp.textContent = 'Listening… tap the mic again to stop.';
+      };
+      dictationRecognition.onresult = event => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) transcript += event.results[i][0].transcript;
+        messageInput.value = transcript;
+      };
+      dictationRecognition.onerror = event => {
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') showToast('Microphone access was denied. Allow it in your browser settings.');
+        else if (event.error !== 'no-speech' && event.error !== 'aborted') showToast(`Voice typing issue: ${event.error}`);
+      };
+      dictationRecognition.onend = () => {
+        dictationActive = false;
+        dictationButton.classList.remove('listening');
+        dictationButton.setAttribute('aria-pressed', 'false');
+        dictationButton.setAttribute('aria-label', 'Speak to type');
+        dictationButton.title = 'Microphone off — tap to dictate';
+        composerHelp.textContent = 'Tap the microphone to dictate. Press Enter to send.';
+        messageInput.focus();
+      };
+      try { dictationRecognition.start(); }
+      catch (_) { showToast('Voice typing is starting. Please try again in a moment.'); }
+    }
+    dictationButton.addEventListener('click', beginDictation);
+
+    function startRecorderCallListening() {
+      if (!callActive || micMuted || requestBusy || speaking || callRecorder || recorderStarting) return;
+      if (!sttAvailable || !navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+        callTopStatus.textContent = 'Voice input unavailable';
+        callCaption.textContent = 'Voice input is unavailable here. Use a recent browser with microphone access.';
+        return;
+      }
+      recorderStarting = true;
+      (async () => {
+        try {
+          if (!callMediaStream) {
+            const acquiredStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+            if (!callActive || micMuted) {
+              acquiredStream.getTracks().forEach(track => track.stop());
+              return;
+            }
+            callMediaStream = acquiredStream;
+          }
+          if (!callActive || micMuted) return;
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) throw new Error('Audio capture is not supported in this browser.');
+          if (!callAudioContext) {
+            callAudioContext = new AudioContextClass();
+            callAudioSource = callAudioContext.createMediaStreamSource(callMediaStream);
+            callAnalyser = callAudioContext.createAnalyser();
+            callAnalyser.fftSize = 1024;
+            callAudioSource.connect(callAnalyser);
+          }
+          if (callAudioContext.state === 'suspended') await callAudioContext.resume();
+          const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(type => MediaRecorder.isTypeSupported(type));
+          const recorder = mimeType ? new MediaRecorder(callMediaStream, { mimeType }) : new MediaRecorder(callMediaStream);
+          callRecorder = recorder;
+          callChunks = [];
+          callSpeechDetected = false;
+          callRecordingStartedAt = Date.now();
+          callLastVoiceAt = 0;
+          recorder.ondataavailable = event => { if (event.data?.size) callChunks.push(event.data); };
+          recorder.onstop = async () => {
+            if (callRecorder === recorder) callRecorder = null;
+            if (callVadFrame) cancelAnimationFrame(callVadFrame);
+            callVadFrame = 0;
+            const chunks = callChunks;
+            callChunks = [];
+            const heardSpeech = callSpeechDetected;
+            callSpeechDetected = false;
+            if (!callActive || micMuted) return;
+            const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+            if (!heardSpeech || blob.size < 1200) {
+              callTopStatus.textContent = 'Listening';
+              setTimeout(startCallListening, 100);
+              return;
+            }
+            await transcribeCallAudio(blob);
+          };
+          recorder.start(200);
+          callTopStatus.textContent = 'Listening';
+          callCaption.textContent = 'Listening — speak naturally. Lucy will reply when you pause.';
+          const samples = new Uint8Array(callAnalyser.fftSize);
+          const inspectAudio = () => {
+            if (!callActive || micMuted || callRecorder !== recorder || recorder.state !== 'recording') return;
+            callAnalyser.getByteTimeDomainData(samples);
+            let energy = 0;
+            for (const sample of samples) {
+              const centered = (sample - 128) / 128;
+              energy += centered * centered;
+            }
+            const level = Math.sqrt(energy / samples.length);
+            const now = Date.now();
+            if (level > 0.025) {
+              callSpeechDetected = true;
+              callLastVoiceAt = now;
+            }
+            const elapsed = now - callRecordingStartedAt;
+            const silenceAfterSpeech = callSpeechDetected && now - callLastVoiceAt > 700 && elapsed > 500;
+            const emptyTurnTimeout = !callSpeechDetected && elapsed > 14000;
+            if (silenceAfterSpeech || emptyTurnTimeout || elapsed > 18000) {
+              recorder.stop();
+              return;
+            }
+            callVadFrame = requestAnimationFrame(inspectAudio);
+          };
+          inspectAudio();
+        } catch (error) {
+          callTopStatus.textContent = 'Microphone permission needed';
+          callCaption.textContent = 'Allow microphone access in your browser settings and make sure this page uses HTTPS.';
+          showToast(error.message || 'Lucy could not access the microphone.');
+        } finally {
+          recorderStarting = false;
+        }
+      })();
+    }
+
+    async function transcribeCallAudio(blob) {
+      callTranscribing = true;
+      callTopStatus.textContent = 'Transcribing';
+      callCaption.textContent = 'I heard you — turning your speech into text…';
+      const mimeType = (blob.type || 'audio/webm').split(';')[0];
+      const extension = ({ 'audio/webm': 'webm', 'audio/mp4': 'mp4', 'audio/m4a': 'm4a', 'audio/ogg': 'ogg', 'audio/wav': 'wav' })[mimeType] || 'audio';
+      try {
+        const response = await fetch('/api/stt', {
+          method: 'POST',
+          headers: { 'Content-Type': mimeType, 'X-Audio-Filename': `lucy-call.${extension}` },
+          body: blob
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'Speech recognition failed.');
+        const transcript = String(data.transcript || '').trim();
+        if (!transcript) throw new Error('I did not catch that. Please try again.');
+        sendToLucy(transcript, true);
+      } catch (error) {
+        if (!callActive) return;
+        callTopStatus.textContent = 'Connected';
+        callCaption.textContent = error.message || 'I did not catch that. Please try again.';
+        showToast(error.message || 'I did not catch that. Please try again.');
+        setTimeout(startCallListening, 300);
+      } finally {
+        callTranscribing = false;
+      }
+    }
+
+    function switchToRecorderCallInput() {
+      if (!sttAvailable) return false;
+      callInputMode = 'recorder';
+      if (recognition) {
+        const oldRecognition = recognition;
+        recognition = null;
+        try { oldRecognition.stop(); } catch (_) { /* Recognition is already stopped. */ }
+      }
+      showToast('Switching call input to built-in speech recognition.');
+      startCallListening();
+      return true;
+    }
+
+    function startCallListening() {
+      if (!callActive || micMuted || micBlocked || requestBusy || speaking) return;
+      if (callInputMode === 'recorder') {
+        startRecorderCallListening();
+        return;
+      }
+      if (!recognition || recognitionRunning) return;
+      try {
+        awaitingReply = false;
+        recognition.start();
+        callTopStatus.textContent = 'Listening';
+        callCaption.textContent = 'Your turn — speak naturally.';
+      } catch (error) {
+        if (error?.name === 'InvalidStateError') return;
+        if (!switchToRecorderCallInput()) {
+          callTopStatus.textContent = 'Microphone permission needed';
+          callCaption.textContent = 'Allow microphone access in your browser settings, then try again.';
+        }
+      }
+    }
+
+    function startCall() {
+      if (callActive) return;
+      const browserRecognitionAvailable = Boolean(SpeechRecognitionAPI);
+      const recorderFallbackAvailable = sttAvailable && Boolean(navigator.mediaDevices?.getUserMedia) && Boolean(window.MediaRecorder);
+      if (!browserRecognitionAvailable && !recorderFallbackAvailable) {
+        callTopStatus.textContent = 'Voice input unavailable';
+        callCaption.textContent = 'This browser has no speech recognition. Use Chrome and open this page over HTTPS.';
+        showToast('Voice calling is not supported in this browser.');
+        return;
+      }
+      callInputMode = browserRecognitionAvailable ? 'browser' : 'recorder';
+      setCallSoundState(true);
+      callActive = true;
+      micMuted = false;
+      micBlocked = false;
+      recognitionRunning = false;
+      callTranscribing = false;
+      speakingSince = 0;
+      callMuted = false;
+      callStartedAt = Date.now();
+      document.body.classList.add('call-active');
+      portraitStage.classList.add('call-active');
+      callTopStatus.textContent = 'Connecting…';
+      callCaption.textContent = 'Connecting to Lucy…';
+      document.getElementById('callMicButton').classList.remove('active');
+      micLabel.textContent = 'Mic on';
+      callMicButton.setAttribute('aria-label', 'Mute microphone');
+      callTimer.textContent = '00:00';
+      syncCallTranscript();
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (!callActive) return;
+        const elapsed = Math.floor((Date.now() - callStartedAt) / 1000);
+        callTimer.textContent = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
+      }, 1000);
+      clearInterval(callWatchdog);
+      // Self-healing: if the mic loop ever stalls (after Delete chat, a slow reply, an error...), restart it.
+      callWatchdog = setInterval(() => {
+        if (!callActive || micMuted || micBlocked) return;
+        if (speaking) {
+          if (!speakingSince) speakingSince = Date.now();
+          const audioPlaying = (activeAudio && !activeAudio.paused) || ('speechSynthesis' in window && window.speechSynthesis.speaking);
+          if (!audioPlaying && Date.now() - speakingSince > 15000) {
+            speaking = false;
+            portraitStage.classList.remove('speaking');
+          }
+          return;
+        }
+        speakingSince = 0;
+        if (requestBusy || callTranscribing) return;
+        if (callInputMode === 'recorder') {
+          if (!callRecorder && !recorderStarting) startCallListening();
+        } else if (!recognitionRunning) {
+          startCallListening();
+        }
+      }, 800);
+      if (callInputMode === 'recorder') {
+        startCallListening();
+        return;
+      }
+      try {
+        recognition = new SpeechRecognitionAPI();
+      } catch (_) {
+        if (switchToRecorderCallInput()) return;
+        callTopStatus.textContent = 'Voice input unavailable';
+        callCaption.textContent = 'Your browser could not start speech recognition.';
+        return;
+      }
+      recognition.lang = 'hi-IN';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+      const sendHeard = text => {
+        clearTimeout(interimTimer);
+        lastInterim = '';
+        if (!text.trim() || requestBusy || !callActive) return;
+        awaitingReply = true;
+        try { recognition && recognition.stop(); } catch (_) { /* Already stopped. */ }
+        sendToLucy(text, true);
+      };
+      recognition.onresult = event => {
+        let finalText = '';
+        let everything = '';
+        for (let i = 0; i < event.results.length; i++) {
+          const piece = event.results[i][0].transcript;
+          everything += piece;
+          if (event.results[i].isFinal) finalText += piece;
+        }
+        if (finalText.trim()) {
+          sendHeard(finalText);
+          return;
+        }
+        // Don't wait for the browser's slow end-of-speech detection: send once the words stop changing.
+        lastInterim = everything;
+        clearTimeout(interimTimer);
+        interimTimer = setTimeout(() => sendHeard(lastInterim), END_OF_SPEECH_MS);
+      };
+      recognition.onerror = event => {
+        if (event.error === 'not-allowed' || event.error === 'audio-capture') {
+          micBlocked = true;  // stop the open/close mic flicker loop
+          callTopStatus.textContent = 'Microphone permission needed';
+          callCaption.textContent = 'Mic blocked. Allow microphone access (page must be on HTTPS or localhost), then tap the mic button.';
+        } else if (['network', 'service-not-allowed', 'language-not-supported'].includes(event.error)) {
+          // Chrome's speech service needs Google servers; Brave, VPN, firewalls or flaky internet cause "network".
+          if (switchToRecorderCallInput()) {
+            callCaption.textContent = 'Browser speech service is unavailable. The built-in recorder is taking over.';
+          } else {
+            micBlocked = true;  // stop the endless open/close loop
+            callTopStatus.textContent = 'Speech service unreachable';
+            callCaption.textContent = 'Browser speech recognition cannot connect (network error). Use Chrome without VPN, then tap the mic button to retry.';
+            showToast('Speech recognition network error. Please try again.');
+          }
+        } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
+          callCaption.textContent = `Speech recognition issue: ${event.error}.`;
+        }
+      };
+      recognition.onstart = () => {
+        recognitionRunning = true;
+        callTopStatus.textContent = 'Listening';
+        callCaption.textContent = 'Your turn — speak naturally.';
+      };
+      recognition.onend = () => {
+        recognitionRunning = false;
+        if (callActive && !awaitingReply && !requestBusy && !speaking && !micMuted && !micBlocked) setTimeout(startCallListening, 150);
+      };
+      startCallListening();
+    }
+
+    function endCall(returnToChat = true) {
+      const wasActive = callActive;
+      callActive = false;
+      awaitingReply = false;
+      speaking = false;
+      micMuted = false;
+      micBlocked = false;
+      recognitionRunning = false;
+      callTranscribing = false;
+      clearInterval(callWatchdog);
+      clearInterval(timerInterval);
+      clearTimeout(interimTimer);
+      lastInterim = '';
+      document.body.classList.remove('call-active');
+      portraitStage.classList.remove('call-active', 'speaking');
+      if (callVadFrame) cancelAnimationFrame(callVadFrame);
+      callVadFrame = 0;
+      if (callRecorder && callRecorder.state !== 'inactive') {
+        try { callRecorder.stop(); } catch (_) { /* Recorder is already stopping. */ }
+      }
+      callRecorder = null;
+      callChunks = [];
+      if (callMediaStream) callMediaStream.getTracks().forEach(track => track.stop());
+      callMediaStream = null;
+      if (callAudioContext && callAudioContext.state !== 'closed') callAudioContext.close().catch(() => {});
+      callAudioContext = null;
+      callAudioSource = null;
+      callAnalyser = null;
+      if (recognition) {
+        try { recognition.stop(); } catch (_) { /* Recognition already stopped. */ }
+        recognition = null;
+      }
+      stopCurrentSpeech();
+      if (wasActive) callTopStatus.textContent = 'Call ended';
+      if (returnToChat && location.pathname === '/call') {
+        window.history.pushState({ page: 'chat' }, '', '/');
+        showPage('chat');
+      }
+    }
+
+    document.getElementById('endCallButton').addEventListener('click', () => endCall(true));
+    callMicButton.addEventListener('click', () => {
+      if (!callActive) { startCall(); return; }
+      micMuted = !micMuted;
+      callMicButton.classList.toggle('active', micMuted);
+      callMicButton.setAttribute('aria-label', micMuted ? 'Unmute microphone' : 'Mute microphone');
+      micLabel.textContent = micMuted ? 'Mic off' : 'Mic on';
+      micIcon.innerHTML = micMuted
+        ? '<rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="m4 4 16 16M5 11a7 7 0 0 0 12 5"></path>'
+        : '<rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3m-4 0h8"></path>';
+      if (micMuted) {
+        if (recognition) try { recognition.stop(); } catch (_) { /* Already stopped. */ }
+        if (callRecorder && callRecorder.state !== 'inactive') {
+          try { callRecorder.stop(); } catch (_) { /* Recorder is already stopping. */ }
+        }
+        callTopStatus.textContent = 'Microphone off';
+        callCaption.textContent = 'Your microphone is muted.';
+      } else if (callActive) {
+        micBlocked = false;
+        startCallListening();
+      }
+    });
+    callSoundButton.addEventListener('click', () => setCallSoundState(callMuted));
+
+    fetch('/api/health').then(response => response.json()).then(data => {
+      providersLoaded = true;
+      searchAvailable = Boolean(data.search_configured);
+      ttsAvailable = Boolean(data.tts_configured);
+      sttAvailable = Boolean(data.stt_configured);
+    }).catch(() => showToast('Backend is unavailable. Start Lucy with python main.py.'));
+
+    if (location.pathname === '/call') {
+      showPage('call');
+      callCaption.textContent = 'Tap the microphone button below to start. Your browser may ask for mic permission.';
+      callTopStatus.textContent = 'Ready to call';
+      micLabel.textContent = 'Start call';
+      callMicButton.setAttribute('aria-label', 'Start call');
+    } else {
+      showPage('chat');
+    }
+  </script>
+</body>
+</html>
